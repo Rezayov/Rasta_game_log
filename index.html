@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mini‑Game: log graph vs log change (dB)</title>
+  <style>
+    :root{
+      --bg:#0b1020; --panel:rgba(255,255,255,.06); --stroke:rgba(255,255,255,.12);
+      --accent:#8ab4ff; --accent2:#f59e0b; --grid:#1f2937; --text:#e5e7eb;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;min-height:100vh;background:radial-gradient(1200px 700px at 20% 10%, #162238 0%, #0b1020 60%, #060914 100%);color:var(--text);font-family:ui-sans-serif,system-ui,Segoe UI,Roboto,Helvetica,Arial}
+    .app{width:min(1100px,96vw);margin:24px auto}
+    .card{background:var(--panel);border:1px solid var(--stroke);border-radius:18px;padding:16px 16px 10px;backdrop-filter:blur(6px);box-shadow:0 6px 30px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.06)}
+    .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+    .row+.row{margin-top:10px}
+    .title{font-weight:800;letter-spacing:.2px}
+    .pill{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid var(--stroke)}
+    .pill input[type="range"]{width:160px}
+    .kbd{font-family:ui-monospace,Menlo,Consolas,monospace;background:#111827;padding:2px 6px;border-radius:6px;border:1px solid #374151}
+    .panel{display:grid;grid-template-columns:1fr;gap:10px}
+    canvas{width:100%;height:420px;border-radius:14px;background:#0b1222;border:1px solid #1b2a46}
+    .legend{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+    .chip{display:inline-flex;align-items:center;gap:8px;padding:6px 10px;border-radius:999px;border:1px solid var(--stroke);background:rgba(255,255,255,.04)}
+    .dot{width:10px;height:10px;border-radius:50%}
+    .dot.blue{background:#60a5fa}
+    .dot.orange{background:#f59e0b}
+    .dot.gray{background:#94a3b8}
+    .help{opacity:.9;line-height:1.7}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="card panel">
+      <div class="row" style="justify-content:space-between">
+        <div class="title">🎮 بازیِ صدا: «نمودار لگاریتمی» و «تغییرِ لگاریتمی»</div>
+        <div class="chip"><b>یادت باشه:</b> دِسی‌بل = <span class="kbd">10×log₁₀(I/I₀)</span> (بلندیِ صدا)</div>
+      </div>
+
+      <div class="row legend">
+        <div class="chip"><span class="dot blue"></span> آبی: بازهٔ جمعیِ ±Δx — یعنی کمی کم‌و‌زیاد می‌کنیم</div>
+        <div class="chip"><span class="dot orange"></span> نارنجی: بازهٔ نسبتیِ ×r — یعنی چندبرابر و تقسیم</div>
+        <div class="chip"><span class="dot gray"></span> خط خاکستری: بلندیِ صدا بر حسب شدت (dB)</div>
+      </div>
+
+      <div class="row">
+        <div class="pill"><label>Δx (جمعی):</label>
+          <input id="dx" type="range" min="0.5" max="50" step="0.5" value="10">
+          <span class="kbd" id="dxVal">10.0</span>
+        </div>
+        <div class="pill"><label>r (نسبتی):</label>
+          <input id="r" type="range" min="1.05" max="4" step="0.01" value="2">
+          <span class="kbd" id="rVal">2× → تغییر ≈ 3.01 dB</span>
+        </div>
+        <div class="pill"><label><input id="showAdd" type="checkbox" checked> نمایش بازهٔ ±Δx</label></div>
+        <div class="pill"><label><input id="showMul" type="checkbox" checked> نمایش بازهٔ ×r</label></div>
+      </div>
+
+      <canvas id="plot" tabindex="0" aria-label="نمودار dB و مینی‌گیم انتخاب بازه"></canvas>
+
+      <div class="row" style="justify-content:space-between">
+        <div class="chip">x = I/I₀ = <span id="xLbl" class="kbd">10.0</span></div>
+        <div class="chip">ΔdB<sub>add</sub> = <span id="dyAdd" class="kbd">—</span></div>
+        <div class="chip">ΔdB<sub>mul</sub> = <span id="dyMul" class="kbd">—</span></div>
+        <div class="chip">راهنما: نقطه را روی خط بکش! 🔊 ببین اختلاف <b>نارنجی</b> وقتی چندبرابر می‌کنی تقریباً ثابت می‌ماند؛ ولی اختلاف <b>آبی</b> هرچه x بزرگ‌تر شود کوچک‌تر می‌شود.</div>
+      </div>
+
+      <div class="help">📣 ساده بگیم: <br>• صدا را با «دِسی‌بل» می‌سنجیم؛ عددِ بیشتر یعنی صدای بلندتر.<br>• اینجا دو جور مقایسه داریم: <b>جمعی</b> (کم و زیاد کردن یک اندازه) و <b>نسبتی</b> (چندبرابر / تقسیم).<br>• در حالت نسبتی، اختلاف فقط به «نسبت» ربط دارد، پس تقریباً در همه‌جا یکسان است. ولی در حالت جمعی، اختلاف به خودِ x بستگی دارد؛ هرچه x بزرگ‌تر، تغییر کوچک‌تر.</div>
+    </div>
+  </div>
+
+<script>
+(function(){
+  const cvs = document.getElementById('plot');
+  const ctx = cvs.getContext('2d');
+  const dxEl = document.getElementById('dx');
+  const rEl = document.getElementById('r');
+  const dxVal = document.getElementById('dxVal');
+  const rVal = document.getElementById('rVal');
+  const xLbl = document.getElementById('xLbl');
+  const dyAddLbl = document.getElementById('dyAdd');
+  const dyMulLbl = document.getElementById('dyMul');
+  const showAdd = document.getElementById('showAdd');
+  const showMul = document.getElementById('showMul');
+
+  // Domain: x = I/I0
+  const XMIN = 1, XMAX = 1000; // 0 dB .. 30 dB
+  const YMIN = 0, YMAX = 30;
+
+  // state
+  let x = 10; // start marker
+  let DX = parseFloat(dxEl.value);
+  let R = parseFloat(rEl.value);
+
+  function log10(v){ return Math.log(v)/Math.LN10; }
+  function dB(x){ return 10*log10(x); }
+
+  function resize(){
+    const w = cvs.clientWidth, h = cvs.clientHeight;
+    const ratio = window.devicePixelRatio || 1;
+    cvs.width = Math.floor(w*ratio); cvs.height = Math.floor(h*ratio);
+    ctx.setTransform(ratio,0,0,ratio,0,0);
+    draw();
+  }
+  window.addEventListener('resize', resize);
+
+  // scales
+  function fx(u){ // x->px
+    const padL=60, padR=20; const W=cvs.clientWidth-padL-padR;
+    return padL + (u - XMIN)/(XMAX - XMIN) * W;
+  }
+  function fy(v){ // y->px (top-down)
+    const padT=16, padB=40; const H=cvs.clientHeight-padT-padB;
+    return padT + (1 - (v - YMIN)/(YMAX - YMIN)) * H;
+  }
+  function invx(px){ const padL=60, padR=20; const W=cvs.clientWidth-padL-padR; return XMIN + (px-padL)/W*(XMAX-XMIN); }
+
+  function grid(){
+    ctx.clearRect(0,0,cvs.clientWidth,cvs.clientHeight);
+    // bg
+    ctx.fillStyle = '#0b1222';
+    ctx.fillRect(0,0,cvs.clientWidth,cvs.clientHeight);
+    // grid
+    ctx.strokeStyle = '#1f2937'; ctx.lineWidth=1;
+    ctx.beginPath();
+    for(let y=0;y<=30;y+=5){ const py=fy(y); ctx.moveTo(56,py); ctx.lineTo(cvs.clientWidth-16,py);} // horiz
+    for(let xg=1;xg<=1000;xg+=99){ const px=fx(xg); ctx.moveTo(px,16); ctx.lineTo(px,cvs.clientHeight-34);} // rough verticals
+    ctx.stroke();
+
+    // axes
+    ctx.strokeStyle = '#375a7a'; ctx.lineWidth=1.5;
+    ctx.beginPath();
+    ctx.moveTo(56,16); ctx.lineTo(56,cvs.clientHeight-34); // y
+    ctx.moveTo(56,cvs.clientHeight-34); ctx.lineTo(cvs.clientWidth-16,cvs.clientHeight-34); // x
+    ctx.stroke();
+
+    // labels
+    ctx.fillStyle = '#d1d5db'; ctx.font='12px sans-serif';
+    for(let y=0;y<=30;y+=5){ ctx.fillText(y+' dB', 14, fy(y)+4); }
+    const tickXs = [1,2,5,10,20,50,100,200,500,1000];
+    tickXs.forEach(v=>{ ctx.save(); ctx.translate(fx(v), cvs.clientHeight-22); ctx.rotate(-Math.PI/4); ctx.fillText('I/I0='+v, 0,0); ctx.restore(); });
+    ctx.fillText('شدت نسبی صدا (I/I0)', cvs.clientWidth-210, cvs.clientHeight-12);
+  }
+
+  function drawCurve(){
+    ctx.strokeStyle = '#94a3b8'; ctx.lineWidth=2;
+    ctx.beginPath();
+    for(let u=XMIN; u<=XMAX; u+=1){ const px=fx(u), py=fy(dB(u)); if(u===XMIN) ctx.moveTo(px,py); else ctx.lineTo(px,py);} 
+    ctx.stroke();
+  }
+
+  function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
+
+  function draw(){
+    grid();
+    drawCurve();
+
+    // additive window
+    let dyAdd = null; let xlA, xrA;
+    if(showAdd.checked){
+      const dx = Math.min(DX, (XMAX-XMIN)/2);
+      xlA = clamp(x-dx, XMIN, XMAX); xrA = clamp(x+dx, XMIN, XMAX);
+      dyAdd = dB(xrA)-dB(xlA);
+      // shade
+      ctx.fillStyle = 'rgba(96,165,250,.15)';
+      ctx.fillRect(fx(xlA), 16, fx(xrA)-fx(xlA), cvs.clientHeight-50);
+      // edges
+      ctx.strokeStyle = '#60a5fa'; ctx.lineWidth=2;
+      [xlA,xrA].forEach(xx=>{ ctx.beginPath(); ctx.moveTo(fx(xx),16); ctx.lineTo(fx(xx),cvs.clientHeight-34); ctx.stroke(); });
+    }
+
+    // multiplicative window
+    let dyMul = null; let xlM, xrM; 
+    if(showMul.checked){
+      const r = Math.max(1.001, R);
+      // keep symmetric window inside domain by clamping x if needed
+      const minXforR = XMIN*r; const maxXforR = XMAX/r; x = clamp(x, minXforR, maxXforR);
+      xlM = x/r; xrM = x*r;
+      dyMul = dB(xrM) - dB(xlM); // = 10*log10(r^2)
+      // shade
+      ctx.fillStyle = 'rgba(245,158,11,.15)';
+      ctx.fillRect(fx(xlM), 16, fx(xrM)-fx(xlM), cvs.clientHeight-50);
+      // edges
+      ctx.strokeStyle = '#f59e0b'; ctx.lineWidth=2;
+      [xlM,xrM].forEach(xx=>{ ctx.beginPath(); ctx.moveTo(fx(xx),16); ctx.lineTo(fx(xx),cvs.clientHeight-34); ctx.stroke(); });
+    }
+
+    // marker x
+    ctx.fillStyle = '#e5e7eb';
+    ctx.beginPath(); ctx.arc(fx(x), fy(dB(x)), 5, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = '#e5e7eb'; ctx.strokeRect(fx(x)-3, fy(dB(x))-3, 6, 6);
+
+    // labels top
+    xLbl.textContent = x.toFixed(2);
+    dyAddLbl.textContent = dyAdd==null? '—' : dyAdd.toFixed(3);
+    dyMulLbl.textContent = dyMul==null? '—' : dyMul.toFixed(3);
+  }
+
+  // interactions
+  let dragging = false;
+  function setXFromEvent(ev){
+    const rect = cvs.getBoundingClientRect();
+    const px = ev.clientX - rect.left;
+    let nx = clamp(invx(px), XMIN, XMAX);
+    x = nx; draw();
+  }
+  cvs.addEventListener('pointerdown', e=>{ dragging=true; cvs.setPointerCapture(e.pointerId); setXFromEvent(e); });
+  cvs.addEventListener('pointermove', e=>{ if(dragging) setXFromEvent(e); });
+  cvs.addEventListener('pointerup',   ()=> dragging=false);
+  cvs.addEventListener('pointercancel',()=> dragging=false);
+
+  dxEl.addEventListener('input', ()=>{ DX=parseFloat(dxEl.value); dxVal.textContent=DX.toFixed(1); draw(); });
+  rEl.addEventListener('input', ()=>{ R=parseFloat(rEl.value); const d = 10*log10(R); rVal.textContent = `${R.toFixed(2)}× → تغییر ≈ ${d.toFixed(2)} dB`; draw(); });
+  showAdd.addEventListener('change', draw); showMul.addEventListener('change', draw);
+
+  // init
+  resize();
+})();
+</script>
+</body>
+</html>
